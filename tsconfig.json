@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es5",
+    "outDir": "lib",
+    "allowJs": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "declarationMap": true,
+    "downlevelIteration": true
+  },
+  "include": ["./src/**/*.ts", "./src/**/*.json"],
+  "exclude": ["node_modules", "lib"]
+}
