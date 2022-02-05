@@ -1,3 +1,5 @@
+import { I80F48 } from "@blockworks-foundation/mango-client";
+
 export function zipDict<K extends string | number | symbol, V>(
   keys: K[],
   values: V[]
@@ -8,3 +10,6 @@ export function zipDict<K extends string | number | symbol, V>(
   });
   return result;
 }
+
+export const i80f48ToPercent = (value: I80F48) =>
+  value.mul(I80F48.fromNumber(100));

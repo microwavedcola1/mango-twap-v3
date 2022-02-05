@@ -49,11 +49,11 @@ cli
         marketOrderCommand(options)
           .then((txId) => {
             if (txId) {
-              logger.info(`market order success: ${txId}`);
+              logger.info(`- market order success: ${txId}`);
             }
           })
           .catch((error) => {
-            logger.error(`market order failed: ${error}`);
+            logger.error(`- market order failed: ${error}`);
           });
       };
 

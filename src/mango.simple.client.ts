@@ -7,15 +7,18 @@ import {
   getMarketByPublicKey,
   getMultipleAccounts,
   GroupConfig,
+  I80F48,
   MangoAccount,
   MangoClient,
   MangoGroup,
   MarketConfig,
+  nativeI80F48ToUi,
   PerpMarket,
   PerpMarketLayout,
   PerpOrder,
+  QUOTE_INDEX,
 } from "@blockworks-foundation/mango-client";
-import { Market, Orderbook } from "@project-serum/serum";
+import { Market, OpenOrders, Orderbook } from "@project-serum/serum";
 import { Order } from "@project-serum/serum/lib/market";
 import {
   Account,
@@ -27,7 +30,7 @@ import {
 } from "@solana/web3.js";
 import BN from "bn.js";
 import { logger } from "./logger";
-import { zipDict } from "./utils/zipDict";
+import { zipDict } from "./zipDict";
 import { OrderInfo } from "./types";
 import bs58 from "bs58";
 import { ENV } from "./constants";
@@ -386,6 +389,76 @@ class MangoSimpleClient {
       order,
       market: { account: market, config },
     }));
+  }
+
+  async fetchSpotPosition(market: string) {
+    // local copies of mango objects
+    const mangoGroupConfig = this.mangoGroupConfig;
+    const mangoGroup = this.mangoGroup;
+
+    // (re)load things which we want fresh
+    const [mangoAccount, mangoCache, rootBanks] = await Promise.all([
+      this.mangoAccount.reload(this.connection, this.mangoGroup.dexProgramId),
+      this.mangoGroup.loadCache(this.connection),
+      mangoGroup.loadRootBanks(this.connection),
+    ]);
+
+    const spotMarketConfig = mangoGroupConfig.spotMarkets.filter(
+      (spotMarketConfig) => spotMarketConfig.name === market
+    )[0];
+    const marketIndex = spotMarketConfig.marketIndex;
+
+    if (!mangoAccount || !mangoGroup) {
+      return [];
+    }
+
+    const openOrders: OpenOrders | undefined =
+      mangoAccount.spotOpenOrdersAccounts[marketIndex];
+    const quoteCurrencyIndex = QUOTE_INDEX;
+
+    let nativeBaseFree = 0;
+    let nativeQuoteFree = 0;
+    let nativeBaseLocked = 0;
+    let nativeQuoteLocked = 0;
+    if (openOrders) {
+      nativeBaseFree = openOrders.baseTokenFree.toNumber();
+      nativeQuoteFree = openOrders.quoteTokenFree
+        .add((openOrders as any)["referrerRebatesAccrued"])
+        .toNumber();
+      nativeBaseLocked = openOrders.baseTokenTotal
+        .sub(openOrders.baseTokenFree)
+        .toNumber();
+      nativeQuoteLocked = openOrders.quoteTokenTotal
+        .sub(openOrders.quoteTokenFree)
+        .toNumber();
+    }
+
+    const tokenIndex = marketIndex;
+
+    const net = (nativeBaseLocked: number, tokenIndex: number) => {
+      const amount = mangoAccount
+        .getUiDeposit(
+          mangoCache.rootBankCache[tokenIndex],
+          mangoGroup,
+          tokenIndex
+        )
+        .add(
+          nativeI80F48ToUi(
+            I80F48.fromNumber(nativeBaseLocked),
+            mangoGroup.tokens[tokenIndex].decimals
+          ).sub(
+            mangoAccount.getUiBorrow(
+              mangoCache.rootBankCache[tokenIndex],
+              mangoGroup,
+              tokenIndex
+            )
+          )
+        );
+
+      return amount;
+    };
+
+    return net(nativeBaseLocked, tokenIndex);
   }
 
   private parsePerpOpenOrders(

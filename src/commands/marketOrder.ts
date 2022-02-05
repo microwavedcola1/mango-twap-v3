@@ -2,10 +2,8 @@ import mangoSimpleClient from "../mango.simple.client";
 import MangoSimpleClient from "../mango.simple.client";
 import { getMarketLastPrice } from "../eventHistoryApi";
 import { logger } from "../logger";
-import {ALL_MARKET_NAMES, MANGO_GROUP_CONFIG} from "../constants";
-import {getAllMarkets, PerpMarket} from "@blockworks-foundation/mango-client";
-import {Market} from "@project-serum/serum";
-import Big from "big.js";
+import { ALL_MARKET_NAMES } from "../constants";
+import { PerpMarket } from "@blockworks-foundation/mango-client";
 
 interface MarketOrderArgs {
   market: string;
@@ -24,16 +22,39 @@ function validate(args: MarketOrderArgs) {
   }
 }
 
+async function logCurrentPosition(args: MarketOrderArgs) {
+  const markets = await client.fetchAllMarkets(args.market);
+  const market = markets[Object.keys(markets)[0]];
+  let position;
+  if (market instanceof PerpMarket) {
+    const perpMarketConfig = client.mangoGroupConfig.perpMarkets.filter(
+      (m) => m.publicKey.toBase58() === market.publicKey.toBase58()
+    )[0];
+    client.mangoAccount.reload(
+      client.connection,
+      client.mangoGroupConfig.serumProgramId
+    );
+    const perpAccount =
+      client.mangoAccount.perpAccounts[perpMarketConfig.marketIndex];
+    position = market.baseLotsToNumber(perpAccount.basePosition);
+  } else {
+    position = await client.fetchSpotPosition(args.market);
+  }
+  logger.info(`- current position on ${args.market} - ${position}`);
+}
+
 export async function marketOrderCommand(
-    args: MarketOrderArgs
+  args: MarketOrderArgs
 ): Promise<string | undefined> {
   if (!client) {
     client = await mangoSimpleClient.create();
   }
 
-  validate(args)
+  validate(args);
 
- const priceThreshold = Number(args.priceThreshold ?? 0);
+  logCurrentPosition(args);
+
+  const priceThreshold = Number(args.priceThreshold ?? 0);
 
   if (priceThreshold > 0) {
     try {
@@ -54,7 +75,8 @@ export async function marketOrderCommand(
   }
 
   try {
-    logger.info("- --mango-client internal logging start--");
+    // Hammer to disable mango client logging
+    console.log = function () {};
     const res = await client.placeOrder(
       args.market,
       args.side,
@@ -63,7 +85,6 @@ export async function marketOrderCommand(
       "market",
       undefined
     );
-    logger.info("- --mango-client internal logging end--");
     return res;
   } catch (e) {
     logger.error(`Error while placing order, ${e}`);
