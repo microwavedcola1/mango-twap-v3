@@ -29,3 +29,6 @@ yarn ts-node src/index.ts twap  --market MNGO/USDC --side buy \
 yarn ts-node src/index.ts twap  --market MNGO-PERP --side buy \
  --amount 1 --interval 10s --priceThreshold 0.20
   ```
+
+## Todo
+* it would be great if we could use the delegate feature to have someone implement twap as a standalone service as well as other trading strategies (like trailing stop)
