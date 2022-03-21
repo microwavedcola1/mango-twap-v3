@@ -29,11 +29,13 @@ import {
   TransactionSignature,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { logger } from "./logger";
-import { zipDict } from "./zipDict";
-import { OrderInfo } from "./types";
 import bs58 from "bs58";
+import os from "os";
+import fs from "fs";
 import { ENV } from "./constants";
+import { logger } from "./logger";
+import { OrderInfo } from "./types";
+import { zipDict } from "./zipDict";
 
 class MangoSimpleClient {
   constructor(
@@ -47,7 +49,7 @@ class MangoSimpleClient {
 
   static async create() {
     const groupName = ENV.GROUP;
-    const clusterUrl = ENV.rpcURL;
+    const clusterUrl = ENV.RPC_URL;
 
     logger.info(`Creating mango client for ${groupName} using ${clusterUrl}`);
 
@@ -73,15 +75,25 @@ class MangoSimpleClient {
     logger.info(`- loading cache`);
     await mangoGroup.loadCache(connection);
 
-    const owner = new Account(bs58.decode(ENV.walletPK));
+    let owner;
+    if (process.env.PRIVATE_KEY_BASE58) {
+      owner = new Account(bs58.decode(process.env.PRIVATE_KEY_BASE58));
+    } else {
+      const privateKeyPath =
+        process.env.PRIVATE_KEY_PATH ||
+        os.homedir() + "/.config/solana/id.json";
+      logger.info(`- loading private key at location ${privateKeyPath}`);
+      owner = new Account(JSON.parse(fs.readFileSync(privateKeyPath, "utf-8")));
+    }
+
     let mangoAccount;
 
-    if (ENV.MANGO_ACCOUNT) {
+    if (ENV.MANGO_ACCOUNT_PK) {
       logger.info(
-        `- MANGO_ACCOUNT explicitly specified, fetching mango account ${ENV.MANGO_ACCOUNT}`
+        `- MANGO_ACCOUNT explicitly specified, fetching mango account ${ENV.MANGO_ACCOUNT_PK}`
       );
       mangoAccount = await mangoClient.getMangoAccount(
-        new PublicKey(ENV.MANGO_ACCOUNT),
+        new PublicKey(ENV.MANGO_ACCOUNT_PK),
         mangoGroupConfig.serumProgramId
       );
     } else {
@@ -197,6 +209,22 @@ class MangoSimpleClient {
     );
   }
 
+  public async getMidPrice(marketName: string): Promise<OrderInfo[]> {
+    const ordersInfo = await this.fetchAllBidsAndAsks(false, marketName);
+
+    // latest bid+ask
+    const bids = ordersInfo
+      .flat()
+      .filter((orderInfo) => orderInfo.order.side === "buy")
+      .sort((b1, b2) => b2.order.price - b1.order.price);
+    const asks = ordersInfo
+      .flat()
+      .filter((orderInfo) => orderInfo.order.side === "sell")
+      .sort((a1, a2) => a1.order.price - a2.order.price);
+
+    return [bids[0], asks[0]];
+  }
+
   public async fetchAllBidsAndAsks(
     filterForMangoAccount: boolean = false,
     marketName?: string
@@ -252,6 +280,51 @@ class MangoSimpleClient {
         );
       }
     });
+  }
+
+  public async cancelAllOrders(market: string) {
+    if (market.includes("PERP")) {
+      const perpMarketConfig = getMarketByBaseSymbolAndKind(
+        this.mangoGroupConfig,
+        market.split("-")[0],
+        "perp"
+      );
+      const perpMarket = await this.mangoGroup.loadPerpMarket(
+        this.connection,
+        perpMarketConfig.marketIndex,
+        perpMarketConfig.baseDecimals,
+        perpMarketConfig.quoteDecimals
+      );
+      await this.client.cancelAllPerpOrders(
+        this.mangoGroup,
+        [perpMarket],
+        this.mangoAccount,
+        this.owner
+      );
+    } else {
+      const spotMarketConfig = getMarketByBaseSymbolAndKind(
+        this.mangoGroupConfig,
+        market.split("/")[0],
+        "spot"
+      );
+      const spotMarket = await Market.load(
+        this.connection,
+        spotMarketConfig.publicKey,
+        undefined,
+        this.mangoGroupConfig.serumProgramId
+      );
+      const orders = (await this.fetchAllBidsAndAsks(true)).flat();
+      logger.info(`- cancelling ${orders.length} orders`);
+      for (const order of orders) {
+        await this.client.cancelSpotOrder(
+          this.mangoGroup,
+          this.mangoAccount,
+          this.owner,
+          spotMarket,
+          order.order as Order
+        );
+      }
+    }
   }
 
   public async placeOrder(

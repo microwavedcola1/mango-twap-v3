@@ -4,8 +4,9 @@ import { getMarketLastPrice } from "../eventHistoryApi";
 import { logger } from "../logger";
 import { ALL_MARKET_NAMES } from "../constants";
 import { PerpMarket } from "@blockworks-foundation/mango-client";
+import { cli } from "winston/lib/winston/config";
 
-interface MarketOrderArgs {
+interface OrderArgs {
   market: string;
   side: "buy" | "sell";
   amount: number;
@@ -14,7 +15,7 @@ interface MarketOrderArgs {
 
 let client: MangoSimpleClient;
 
-function validate(args: MarketOrderArgs) {
+export function validate(args: OrderArgs) {
   // size is verified by mango-client
 
   if (!ALL_MARKET_NAMES.includes(args.market)) {
@@ -22,7 +23,7 @@ function validate(args: MarketOrderArgs) {
   }
 }
 
-async function logCurrentPosition(args: MarketOrderArgs) {
+async function logCurrentPosition(args: OrderArgs) {
   const markets = await client.fetchAllMarkets(args.market);
   const market = markets[Object.keys(markets)[0]];
   let position;
@@ -43,8 +44,16 @@ async function logCurrentPosition(args: MarketOrderArgs) {
   logger.info(`- current position on ${args.market} - ${position}`);
 }
 
-export async function marketOrderCommand(
-  args: MarketOrderArgs
+export async function cancelAllExistingOrders(args: OrderArgs) {
+  if (!client) {
+    client = await mangoSimpleClient.create();
+  }
+  logger.info(`- cancelling all existing orders on ${args.market}`);
+  await client.cancelAllOrders(args.market);
+}
+
+export async function orderCommand(
+  args: OrderArgs
 ): Promise<string | undefined> {
   if (!client) {
     client = await mangoSimpleClient.create();
@@ -54,11 +63,22 @@ export async function marketOrderCommand(
 
   logCurrentPosition(args);
 
+  await cancelAllExistingOrders(args);
+
   const priceThreshold = Number(args.priceThreshold ?? 0);
+  const currentPrice = await getMarketLastPrice(args.market);
+  logger.info(`- last trade on ${args.market} was at price ${currentPrice}`);
+
+  const orders = await client.getMidPrice(args.market);
+  const bid = orders[0];
+  const ask = orders[1];
+  const midPrice = (bid.order.price + ask.order.price) / 2;
+  logger.info(
+    `- best bid on ${args.market} was at price ${bid.order.price}, best ask at price ${ask.order.price}`
+  );
 
   if (priceThreshold > 0) {
     try {
-      const currentPrice = await getMarketLastPrice(args.market);
       if (args.side == "buy" && currentPrice > priceThreshold) {
         logger.info(
           `current price ${currentPrice} is greater than ${args.priceThreshold}, skip buy for now`
@@ -77,12 +97,15 @@ export async function marketOrderCommand(
   try {
     // Hammer to disable mango client logging
     console.log = function () {};
+    logger.info(
+      `- placing a ${args.side} post only order at midprice ${midPrice} of size ${args.amount} on ${args.market}`
+    );
     const res = await client.placeOrder(
       args.market,
       args.side,
       args.amount,
-      undefined,
-      "market",
+      midPrice,
+      "postOnly",
       undefined
     );
     return res;

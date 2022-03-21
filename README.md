@@ -1,6 +1,7 @@
 mango-v3 twap, inspired by [jup-twap](https://github.com/gopartyparrot/jup-twap)
 
 ## Development
+
 ```
 node --version
 v16.13.1
@@ -10,6 +11,7 @@ nodemon src/index.ts twap --market BTC-PERP --side buy \
 ```
 
 ## Example
+
 copy .env.example into .env, fill with desired properties, and then run as below
 
 ```
@@ -24,11 +26,14 @@ WALLET_PK= base58 encoded private key for wallet (can be exported from phantom)
 yarn ts-node src/index.ts twap  --market MNGO/USDC --side buy \
  --amount 1 --interval 10s --priceThreshold 0.20
 ```
+
 ```
 # perp
 yarn ts-node src/index.ts twap  --market MNGO-PERP --side buy \
  --amount 1 --interval 10s --priceThreshold 0.20
-  ```
+```
 
-## Todo
-* it would be great if we could use the delegate feature to have someone implement twap as a standalone service as well as other trading strategies (like trailing stop)
+```
+# cancelling all existing orders for a market
+yarn ts-node src/index.ts cancel --market BTC/USDC
+```

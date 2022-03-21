@@ -1,20 +1,52 @@
-import "dotenv/config";
+import { MangoClient } from "@blockworks-foundation/mango-client";
 import Duration from "@icholy/duration";
-import { Command } from "commander";
-
-import { marketOrderCommand } from "./commands/marketOrder";
-import { logger } from "./logger";
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
+import { Command } from "commander";
+import "dotenv/config";
+import { cancelCommand } from "./commands/cancelOrder";
+import { orderCommand } from "./commands/order";
 import { ENV } from "./constants";
+import { logger } from "./logger";
 
 const cli = new Command();
 
 cli.version("1.0.0");
 
 cli
+  .command("cancel")
+  .description("order")
+  .requiredOption("--market <market>")
+  .action(
+    async (options: {
+      market: string; //todo validation
+    }) => {
+      logger.info(
+        `using wallet ${
+          Keypair.fromSecretKey(bs58.decode(ENV.PRIVATE_KEY_BASE58)).publicKey
+        }`
+      );
+
+      logger.info(`cancelling orders on ${options.market}`);
+
+      const cancelOrder = () => {
+        cancelCommand(options)
+          .catch((error) => {
+            logger.error(`- order failed: ${error}`);
+            process.exit();
+          })
+          .then(() => {
+            process.exit();
+          });
+      };
+
+      cancelOrder();
+    }
+  );
+
+cli
   .command("twap")
-  .description("market order")
+  .description("order")
   .requiredOption("--interval <interval>")
   .requiredOption("--market <market>")
   .requiredOption("--side <side>")
@@ -36,7 +68,7 @@ cli
     }) => {
       logger.info(
         `using wallet ${
-          Keypair.fromSecretKey(bs58.decode(ENV.walletPK)).publicKey
+          Keypair.fromSecretKey(bs58.decode(ENV.PRIVATE_KEY_BASE58)).publicKey
         }`
       );
 
@@ -44,25 +76,22 @@ cli
         `twap ${options.side} of ${options.amount} on ${options.market} every ${options.interval} ready`
       );
 
-      const runMarketOrder = () => {
-        logger.info(`market order starting...`);
-        marketOrderCommand(options)
+      const runOrder = () => {
+        logger.info(`order starting...`);
+        orderCommand(options)
           .then((txId) => {
             if (txId) {
-              logger.info(`- market order success: ${txId}`);
+              logger.info(`- placed order successfully: tx id - ${txId}`);
             }
           })
           .catch((error) => {
-            logger.error(`- market order failed: ${error}`);
+            logger.error(`- order failed: ${error}`);
           });
       };
 
       // Do a first market order at start-up
-      runMarketOrder();
-      setInterval(
-        runMarketOrder,
-        new Duration(options.interval).milliseconds()
-      );
+      runOrder();
+      setInterval(runOrder, new Duration(options.interval).milliseconds());
     }
   );
 
