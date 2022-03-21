@@ -1,10 +1,10 @@
 import { Config, GroupConfig } from "@blockworks-foundation/mango-client";
 
 export const ENV = {
-  rpcURL: process.env.RPC_URL ?? "",
-  walletPK: process.env.WALLET_PK ?? "",
+  RPC_URL: process.env.RPC_URL ?? "",
+  PRIVATE_KEY_BASE58: process.env.PRIVATE_KEY_BASE58 ?? "",
   GROUP: process.env.GROUP ?? "",
-  MANGO_ACCOUNT: process.env.MANGO_ACCOUNT ?? "",
+  MANGO_ACCOUNT_PK: process.env.MANGO_ACCOUNT_PK ?? "",
 };
 
 // Hardcode since offchain data is only maintained for mainnet
