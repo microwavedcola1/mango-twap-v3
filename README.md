@@ -1,5 +1,7 @@
 mango-v3 twap, inspired by [jup-twap](https://github.com/gopartyparrot/jup-twap)
 
+places post only orders at midprice i.e. best (bid+ask)/2
+
 ## Development
 
 ```
@@ -18,7 +20,7 @@ copy .env.example into .env, fill with desired properties, and then run as below
 MANGO_ACCOUNT= mango account public key
 GROUP= devnet.2 (for testing) or mainnet.1
 RPC_URL= devnet or mainnet RPC URL
-WALLET_PK= base58 encoded private key for wallet (can be exported from phantom)
+PRIVATE_KEY_BASE58= base58 encoded private key for wallet (can be exported from phantom), can also be the delegate's private key
 ```
 
 ```
