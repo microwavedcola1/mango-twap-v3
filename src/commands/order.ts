@@ -63,7 +63,11 @@ export async function orderCommand(
 
   logCurrentPosition(args);
 
-  await cancelAllExistingOrders(args);
+  try {
+    await cancelAllExistingOrders(args);
+  } catch (error) {
+    logger.error(`- order failed: ${error}`);
+  }
 
   const priceThreshold = Number(args.priceThreshold ?? 0);
   const currentPrice = await getMarketLastPrice(args.market);
