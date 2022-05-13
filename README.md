@@ -17,7 +17,7 @@ nodemon src/index.ts twap --market BTC-PERP --side buy \
 copy .env.example into .env, fill with desired properties, and then run as below
 
 ```
-MANGO_ACCOUNT= mango account public key
+MANGO_ACCOUNT_PK= mango account public key
 GROUP= devnet.2 (for testing) or mainnet.1
 RPC_URL= devnet or mainnet RPC URL
 PRIVATE_KEY_BASE58= base58 encoded private key for wallet (can be exported from phantom), can also be the delegate's private key

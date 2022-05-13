@@ -90,7 +90,7 @@ class MangoSimpleClient {
 
     if (ENV.MANGO_ACCOUNT_PK) {
       logger.info(
-        `- MANGO_ACCOUNT explicitly specified, fetching mango account ${ENV.MANGO_ACCOUNT_PK}`
+        `- MANGO_ACCOUNT_PK explicitly specified, fetching mango account ${ENV.MANGO_ACCOUNT_PK}`
       );
       mangoAccount = await mangoClient.getMangoAccount(
         new PublicKey(ENV.MANGO_ACCOUNT_PK),
